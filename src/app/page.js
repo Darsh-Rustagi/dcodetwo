@@ -108,7 +108,8 @@ export default function DashboardPage() {
             </ul>
           </nav>
           <div className="p-4 border-t border-amber-200/80">
-            <a href="#" className="flex items-center gap-3 p-3 rounded-lg hover:bg-amber-200/50 font-medium text-zinc-700">
+            {/* THIS IS THE EDITED LINE */}
+            <a href="/profile" className="flex items-center gap-3 p-3 rounded-lg hover:bg-amber-200/50 font-medium text-zinc-700">
               <Settings size={20} /> Settings
             </a>
             <a href="#" className="flex items-center gap-3 p-3 rounded-lg hover:bg-amber-200/50 font-medium text-zinc-700">
