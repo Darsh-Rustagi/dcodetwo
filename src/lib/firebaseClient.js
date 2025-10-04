@@ -1,4 +1,4 @@
-// src/lib/firebaseClient.js
+
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 
@@ -11,8 +11,11 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
 };
 
-// Initialize Firebase only if it hasn't been initialized yet
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-const db = getFirestore(app);
+// Initialize Firebase
+const firebaseApp = initializeApp(firebaseConfig);
+const db = getFirestore(firebaseApp);
 
-export { db };
+// --- EDIT ---
+// Ensure you have a NAMED EXPORT for firebaseApp. 
+// This is the crucial change that will fix the error.
+export { db, firebaseApp };
