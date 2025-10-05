@@ -1,10 +1,14 @@
-// src/components/MentorCard.js
 "use client";
 
 import React from 'react';
 import { motion } from 'framer-motion';
 
 const MentorCard = ({ mentor, index }) => {
+  // --- FIX: Add default values to prevent errors if data is missing ---
+  const mentorName = mentor.name || 'Unknown User';
+  const skillsToTeach = mentor.skillsToTeach || [];
+  const interests = mentor.interests || [];
+
   return (
     <motion.div
       className="bg-white/80 p-4 rounded-xl border border-amber-200/80 shadow-sm flex items-center justify-between"
@@ -14,15 +18,15 @@ const MentorCard = ({ mentor, index }) => {
     >
       <div className="flex items-center gap-4">
         <div className="w-14 h-14 rounded-full bg-amber-500 text-white flex items-center justify-center font-bold text-xl flex-shrink-0">
-          {mentor.name.substring(0, 2).toUpperCase()}
+          {mentorName.substring(0, 2).toUpperCase()}
         </div>
         <div>
-          <h3 className="font-bold text-lg text-zinc-900">{mentor.name}</h3>
+          <h3 className="font-bold text-lg text-zinc-900">{mentorName}</h3>
           <p className="text-sm text-zinc-600">
-            Teaches: {mentor.skillsToTeach.map(s => s.name).join(', ')}
+            Teaches: {skillsToTeach.map(s => s.name).join(', ') || 'N/A'}
           </p>
           <p className="text-xs text-zinc-500 mt-1">
-            Interests: {mentor.interests.join(', ')}
+            Interests: {interests.join(', ') || 'N/A'}
           </p>
         </div>
       </div>

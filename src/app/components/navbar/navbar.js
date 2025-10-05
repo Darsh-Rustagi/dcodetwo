@@ -10,13 +10,13 @@ export default function Navbar({ user, handleSignOut }) {
       <div className="font-bold text-2xl text-zinc-900">Mentora</div>
       <ul className="flex gap-6">
         <li>
-          <Link href="/" className={`hover:text-blue-600 ${pathname === '/' ? 'text-blue-600 font-semibold' : ''}`}>Home</Link>
+          <Link href="/" className={`text-black hover:text-blue-600 ${pathname === '/' ? 'text-blue-600 font-semibold' : ''}`}>Home</Link>
         </li>
         <li>
-          <Link href="/study" className={`hover:text-blue-600 ${pathname === '/study' ? 'text-blue-600 font-semibold' : ''}`}>Study</Link>
+          <Link href="/study" className={`text-black hover:text-blue-600 ${pathname === '/study' ? 'text-blue-600 font-semibold' : ''}`}>Study</Link>
         </li>
         <li>
-          <Link href="/chat" className={`hover:text-blue-600 ${pathname === '/chat' ? 'text-blue-600 font-semibold' : ''}`}>Chat</Link>
+          <Link href="/chat" className={`text-black hover:text-blue-600 ${pathname === '/chat' ? 'text-blue-600 font-semibold' : ''}`}>Chat</Link>
         </li>
       </ul>
       {user && (
