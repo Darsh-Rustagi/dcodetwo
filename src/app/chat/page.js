@@ -1,58 +1,72 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Search, Send, ChevronLeft, MoreVertical, Paperclip, Smile } from 'lucide-react';
+import { Search, Send, ChevronLeft, MoreVertical, Paperclip, Smile, MessageSquarePlus } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+// --- EDIT: Import Firebase dependencies ---
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '../../lib/firebaseClient'; // Adjust path if necessary
 
 // --- Mock Data ---
-const mentors = [
-    { id: 1, name: 'Dr. Evelyn Reed', avatar: 'https://placehold.co/100x100/f59e0b/000000?text=ER', online: true },
-    { id: 2, name: 'Marcus Vance', avatar: 'https://placehold.co/100x100/4ade80/000000?text=MV', online: false },
-    { id: 3, name: 'Dr. Aliza Sharma', avatar: 'https://placehold.co/100x100/60a5fa/000000?text=AS', online: true },
-    { id: 4, name: 'Kenji Tanaka', avatar: 'https://placehold.co/100x100/f472b6/000000?text=KT', online: false },
-    { id: 5, name: 'Sofia Rossi', avatar: 'https://placehold.co/100x100/fb923c/000000?text=SR', online: true },
-];
-
+// This will be used as a fallback if no chats are stored locally.
 const initialMessages = {
     1: [
         { id: 1, text: 'Hi Dr. Reed! I had a follow-up question about our last session.', sender: 'me', timestamp: '10:40 AM' },
         { id: 2, text: 'Of course, I\'m here to help. What\'s on your mind?', sender: 'mentor', timestamp: '10:41 AM' },
-        { id: 3, text: 'Absolutely, let\'s discuss quantum states.', sender: 'mentor', timestamp: '10:42 AM' },
     ],
     3: [
         { id: 1, text: 'Hello Dr. Sharma, do you have a moment to chat?', sender: 'me', timestamp: '9:14 AM' },
-        { id: 2, text: 'The hippocampus is fascinating, isn\'t it?', sender: 'mentor', timestamp: '9:15 AM' },
     ],
-    5: [
-        { id: 1, text: 'Good morning, Sofia!', sender: 'me', timestamp: '11:00 AM' },
-        { id: 2, text: 'Yes, I can share some resources on Renaissance art.', sender: 'mentor', timestamp: '11:01 AM' },
-    ]
 };
 
 
 // --- Main Chat Page Component ---
 export default function ChatsPage() {
-    const firstChatMentor = useMemo(() => mentors.find(m => initialMessages[m.id]), []);
-
+    // --- EDIT: The mentors list is now managed by state ---
+    const [mentors, setMentors] = useState([]);
     const [messages, setMessages] = useState({});
     const [selectedChat, setSelectedChat] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [newMessage, setNewMessage] = useState('');
     const chatEndRef = useRef(null);
     
-    // Load messages from localStorage on initial render
+    // --- EDIT: Fetch mentors from Firestore and load messages on initial render ---
     useEffect(() => {
-        const savedMessages = localStorage.getItem('mentoraChatMessages');
-        const loadedMessages = savedMessages ? JSON.parse(savedMessages) : initialMessages;
-        setMessages(loadedMessages);
+        const fetchData = async () => {
+            try {
+                // 1. Fetch all users from the 'users' collection in Firestore
+                const usersCollectionRef = collection(db, 'users');
+                const usersSnapshot = await getDocs(usersCollectionRef);
+                const fetchedMentors = usersSnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    name: doc.data().name || 'Unnamed User',
+                    // Create a placeholder avatar from initials
+                    avatar: `https://placehold.co/100x100/f59e0b/000000?text=${(doc.data().name || 'U').substring(0,2).toUpperCase()}`,
+                    online: Math.random() > 0.5, // Mock online status
+                    title: doc.data().style || 'Mentor', // Use 'style' field as title
+                    ...doc.data(),
+                }));
+                setMentors(fetchedMentors);
 
-        // Set the initial selected chat based on loaded messages
-        const firstMentorWithHistory = mentors.find(m => loadedMessages[m.id]);
-        setSelectedChat(firstMentorWithHistory || null);
+                // 2. Load messages from localStorage
+                const savedMessages = localStorage.getItem('mentoraChatMessages');
+                const loadedMessages = savedMessages ? JSON.parse(savedMessages) : initialMessages;
+                setMessages(loadedMessages);
+
+                // 3. Set the initial selected chat after all data is loaded
+                const firstMentorWithHistory = fetchedMentors.find(m => loadedMessages[m.id]);
+                setSelectedChat(firstMentorWithHistory || null);
+
+            } catch (error) {
+                console.error("Error fetching user data:", error);
+                // Handle error state if needed
+            }
+        };
+
+        fetchData();
     }, []);
 
-    // Save messages to localStorage whenever they change
     useEffect(() => {
-        // We check if messages is not an empty object before saving
         if (Object.keys(messages).length > 0) {
             localStorage.setItem('mentoraChatMessages', JSON.stringify(messages));
         }
@@ -82,130 +96,64 @@ export default function ChatsPage() {
         setNewMessage('');
     };
 
-    const mentorsToDisplay = useMemo(() => {
-        // If searching, filter all mentors
-        if (searchTerm.trim() !== '') {
-            return mentors.filter(mentor =>
-                mentor.name.toLowerCase().includes(searchTerm.toLowerCase())
-            );
-        }
-        // Otherwise, only show mentors with an existing conversation
-        return mentors.filter(mentor => messages[mentor.id]);
-    }, [searchTerm, messages]);
+    const filteredMentors = useMemo(() => {
+        return mentors.filter(mentor =>
+            mentor.name.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+    }, [searchTerm, mentors]); // --- EDIT: Added mentors as a dependency
+    
+    const recentChats = useMemo(() => {
+        return filteredMentors.filter(mentor => messages[mentor.id] && messages[mentor.id].length > 0);
+    }, [filteredMentors, messages]);
+
+    const otherMentors = useMemo(() => {
+        return filteredMentors.filter(mentor => !messages[mentor.id] || messages[mentor.id].length === 0);
+    }, [filteredMentors, messages]);
+
 
     return (
-        <main className="bg-amber-100 font-sans">
-            <div className="h-screen flex flex-col">
-                 {/* Spacer for the fixed navbar */}
-                 <div className="h-16 md:h-24 flex-shrink-0"></div>
-
-                <div className="flex-grow flex min-h-0">
+        <main className="font-sans bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100">
+            <div className="h-screen w-full p-4 flex">
+                <div className="flex w-full h-full bg-white/70 backdrop-blur-xl rounded-2xl shadow-2xl shadow-amber-200/50 border border-white/50 overflow-hidden">
                     {/* --- Sidebar / Chat List --- */}
-                    <aside className={`w-full md:w-1/3 lg:w-1/4 bg-white/80 border-r border-amber-200/80 flex flex-col transition-all duration-300 ${selectedChat && 'hidden md:flex'}`}>
+                    <aside className={`w-full md:w-1/3 lg:w-1/4 xl:w-1/5 bg-white/50 border-r border-amber-200/80 flex flex-col transition-all duration-300 ${selectedChat && 'hidden md:flex'}`}>
                         <div className="p-4 border-b border-amber-200/80">
-                            <h2 className="text-2xl font-bold text-zinc-900 mb-4">Chats</h2>
-                            <div className="relative">
+                            <h2 className="text-3xl font-bold text-zinc-900">Chats</h2>
+                            <div className="relative mt-4">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" size={20} />
                                 <input
                                     type="text"
                                     placeholder="Search mentors..."
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
-                                    className="w-full bg-amber-50/50 border border-amber-200/60 rounded-lg py-2 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                                    className="w-full bg-amber-50/50 border-2 border-amber-200/60 rounded-lg py-2.5 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-amber-400 text-zinc-900"
                                 />
                             </div>
                         </div>
                         <div className="flex-grow overflow-y-auto">
-                            {mentorsToDisplay.map(mentor => {
-                                const lastMessage = messages[mentor.id]?.[messages[mentor.id].length - 1];
-                                return (
-                                <div
-                                    key={mentor.id}
-                                    onClick={() => setSelectedChat(mentor)}
-                                    className={`flex items-center p-4 cursor-pointer border-l-4 transition-colors ${selectedChat?.id === mentor.id ? 'bg-amber-100 border-amber-500' : 'border-transparent hover:bg-amber-100/50'}`}
-                                >
-                                    <div className="relative mr-4 flex-shrink-0">
-                                        <img src={mentor.avatar} alt={mentor.name} className="w-10 h-10 rounded-full" />
-                                        {mentor.online && <span className="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full bg-green-500 border-2 border-white"></span>}
-                                    </div>
-                                    <div className="flex-grow overflow-hidden">
-                                        <div className="flex justify-between items-center">
-                                            <h3 className="font-bold text-zinc-800 truncate">{mentor.name}</h3>
-                                            {lastMessage && <p className="text-xs text-zinc-500 flex-shrink-0 ml-2">{lastMessage.timestamp}</p>}
-                                        </div>
-                                        <p className="text-sm text-zinc-600 truncate">{lastMessage?.text || 'Start a conversation'}</p>
-                                    </div>
-                                </div>
-                            )})}
+                            {/* Recent Chats Section */}
+                            {recentChats.length > 0 && <h3 className="px-4 py-2 text-sm font-semibold text-zinc-500">Recent Chats</h3>}
+                            {recentChats.map(mentor => (
+                                <ChatItem key={mentor.id} mentor={mentor} messages={messages} selectedChat={selectedChat} onSelect={() => setSelectedChat(mentor)} />
+                            ))}
+
+                            {/* Other Mentors Section */}
+                            {otherMentors.length > 0 && <h3 className="px-4 py-2 mt-2 text-sm font-semibold text-zinc-500">All Mentors</h3>}
+                            {otherMentors.map(mentor => (
+                                <ChatItem key={mentor.id} mentor={mentor} messages={messages} selectedChat={selectedChat} onSelect={() => setSelectedChat(mentor)} />
+                            ))}
                         </div>
                     </aside>
 
                     {/* --- Main Chat Window --- */}
-                    <section className={`w-full flex flex-col bg-amber-200/40 transition-all duration-300 ${!selectedChat && 'hidden md:flex'}`}>
+                    <section className={`w-full flex flex-col bg-amber-100/30 transition-all duration-300 ${!selectedChat && 'hidden md:flex'}`}>
                         {selectedChat ? (
-                            <>
-                                <header className="flex items-center p-4 bg-white/80 border-b border-amber-200/80 shadow-sm flex-shrink-0">
-                                    <button onClick={() => setSelectedChat(null)} className="md:hidden mr-4 text-zinc-600">
-                                        <ChevronLeft />
-                                    </button>
-                                    <img src={selectedChat.avatar} alt={selectedChat.name} className="w-10 h-10 rounded-full mr-4" />
-                                    <div>
-                                        <h3 className="font-bold text-zinc-900">{selectedChat.name}</h3>
-                                        <p className="text-sm text-green-600">{selectedChat.online ? 'Online' : 'Offline'}</p>
-                                    </div>
-                                    <div className="ml-auto">
-                                        <button className="text-zinc-500 hover:text-zinc-800 p-2 rounded-full hover:bg-amber-100/50 transition-colors">
-                                            <MoreVertical />
-                                        </button>
-                                    </div>
-                                </header>
-
-                                <div className="flex-grow p-4 overflow-y-auto">
-                                    {messages[selectedChat.id]?.map((msg, index) => {
-                                        const chatMessages = messages[selectedChat.id] || [];
-                                        const showAvatar = msg.sender === 'mentor' && (!chatMessages[index + 1] || chatMessages[index + 1].sender !== 'mentor');
-
-                                        return (
-                                            <div key={msg.id} className={`flex items-end gap-2 my-1 ${msg.sender === 'me' ? 'justify-end' : 'justify-start'}`}>
-                                                {msg.sender === 'mentor' && (
-                                                    showAvatar ? 
-                                                    <img src={selectedChat.avatar} className="w-7 h-7 rounded-full" alt={selectedChat.name} /> :
-                                                    <div className="w-7" /> // Spacer for alignment
-                                                )}
-                                                <div className={`max-w-xs md:max-w-md p-3 px-4 rounded-2xl shadow-sm ${msg.sender === 'me' ? 'bg-zinc-900 text-white rounded-br-lg' : 'bg-white text-zinc-800 rounded-bl-lg'}`}>
-                                                    <p className="text-sm">{msg.text}</p>
-                                                    <p className={`text-xs mt-1 ${msg.sender === 'me' ? 'text-zinc-400' : 'text-zinc-500'} text-right`}>{msg.timestamp}</p>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                    <div ref={chatEndRef} />
-                                </div>
-
-                                <footer className="p-4 bg-white/80 border-t border-amber-200/80 flex-shrink-0">
-                                    <form onSubmit={handleSendMessage} className="flex items-center gap-2 bg-white border border-amber-200/60 rounded-full py-1 px-2 shadow-sm">
-                                        <button type="button" className="p-2 text-zinc-500 hover:text-zinc-800 rounded-full hover:bg-amber-100/50 transition-colors">
-                                            <Smile size={20} />
-                                        </button>
-                                         <button type="button" className="p-2 text-zinc-500 hover:text-zinc-800 rounded-full hover:bg-amber-100/50 transition-colors">
-                                            <Paperclip size={20} />
-                                        </button>
-                                        <input
-                                            type="text"
-                                            placeholder="Type a message..."
-                                            value={newMessage}
-                                            onChange={(e) => setNewMessage(e.target.value)}
-                                            className="w-full bg-transparent focus:outline-none px-2 text-sm"
-                                        />
-                                        <button type="submit" className="bg-zinc-900 text-white p-2.5 rounded-full hover:bg-zinc-800 transition-colors transform hover:scale-105">
-                                            <Send size={18} />
-                                        </button>
-                                    </form>
-                                </footer>
-                            </>
+                            <ChatWindow selectedChat={selectedChat} messages={messages[selectedChat.id] || []} onSendMessage={handleSendMessage} newMessage={newMessage} setNewMessage={setNewMessage} onBack={() => setSelectedChat(null)} chatEndRef={chatEndRef} />
                         ) : (
-                            <div className="flex items-center justify-center h-full text-zinc-500">
-                                <p>Select or search for a mentor to start chatting</p>
+                            <div className="flex flex-col items-center justify-center h-full text-zinc-500 text-center p-4">
+                                <MessageSquarePlus size={48} className="mb-4 text-amber-400"/>
+                                <h3 className="text-xl font-semibold">Welcome to Mentora Chat</h3>
+                                <p>Select or search for a mentor to start a conversation.</p>
                             </div>
                         )}
                     </section>
@@ -214,3 +162,91 @@ export default function ChatsPage() {
         </main>
     );
 }
+
+// --- Sub-component: ChatItem ---
+const ChatItem = ({ mentor, messages, selectedChat, onSelect }) => {
+    const lastMessage = messages[mentor.id]?.[messages[mentor.id].length - 1];
+    return (
+        <motion.div
+            onClick={onSelect}
+            className={`flex items-center p-4 cursor-pointer border-l-4 transition-colors ${selectedChat?.id === mentor.id ? 'bg-amber-100 border-amber-500' : 'border-transparent hover:bg-amber-100/50'}`}
+            whileHover={{ scale: 1.02 }}
+        >
+            <div className="relative mr-4 flex-shrink-0">
+                <img src={mentor.avatar} alt={mentor.name} className="w-12 h-12 rounded-full" />
+                {mentor.online && <span className="absolute bottom-0 right-0 block h-3 w-3 rounded-full bg-green-500 border-2 border-white"></span>}
+            </div>
+            <div className="flex-grow overflow-hidden">
+                <div className="flex justify-between items-center">
+                    <h3 className="font-bold text-zinc-800 truncate">{mentor.name}</h3>
+                    {lastMessage && <p className="text-xs text-zinc-500 flex-shrink-0 ml-2">{lastMessage.timestamp}</p>}
+                </div>
+                <p className="text-sm text-zinc-600 truncate">{lastMessage?.text || `Start chatting with ${mentor.title}`}</p>
+            </div>
+        </motion.div>
+    );
+};
+
+// --- Sub-component: ChatWindow ---
+const ChatWindow = ({ selectedChat, messages, onSendMessage, newMessage, setNewMessage, onBack, chatEndRef }) => {
+    return (
+        <>
+            <header className="flex items-center p-4 bg-white/70 backdrop-blur-xl border-b border-amber-200/80 shadow-sm flex-shrink-0 z-10">
+                <button onClick={onBack} className="md:hidden mr-4 text-zinc-600">
+                    <ChevronLeft />
+                </button>
+                <img src={selectedChat.avatar} alt={selectedChat.name} className="w-10 h-10 rounded-full mr-4" />
+                <div>
+                    <h3 className="font-bold text-zinc-900">{selectedChat.name}</h3>
+                    <p className={`text-sm font-semibold ${selectedChat.online ? 'text-green-600' : 'text-zinc-500'}`}>{selectedChat.online ? 'Online' : 'Offline'}</p>
+                </div>
+                <div className="ml-auto"><button className="text-zinc-500 hover:text-zinc-800 p-2 rounded-full hover:bg-amber-100/50 transition-colors"><MoreVertical /></button></div>
+            </header>
+
+            <div className="flex-grow p-4 overflow-y-auto">
+                <AnimatePresence>
+                {messages.map((msg, index) => {
+                    const showAvatar = msg.sender === 'mentor' && (!messages[index + 1] || messages[index + 1].sender !== 'mentor');
+                    return (
+                        <motion.div
+                            key={msg.id}
+                            layout
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ type: 'spring', stiffness: 200, damping: 20 }}
+                            className={`flex items-end gap-2 my-2 ${msg.sender === 'me' ? 'justify-end' : 'justify-start'}`}
+                        >
+                            {msg.sender === 'mentor' && (showAvatar ? <img src={selectedChat.avatar} className="w-7 h-7 rounded-full" alt={selectedChat.name} /> : <div className="w-7" />)}
+                            <div className={`max-w-xs md:max-w-lg p-3 px-4 rounded-2xl shadow-md ${msg.sender === 'me' ? 'bg-zinc-900 text-white rounded-br-lg' : 'bg-white text-zinc-800 rounded-bl-lg'}`}>
+                                <p className="text-sm">{msg.text}</p>
+                            </div>
+                        </motion.div>
+                    );
+                })}
+                </AnimatePresence>
+                <div ref={chatEndRef} />
+            </div>
+
+            <footer className="p-4 bg-white/70 backdrop-blur-xl border-t border-amber-200/80 flex-shrink-0">
+                <form onSubmit={onSendMessage} className="flex items-center gap-2">
+                    <div className="flex items-center gap-1">
+                        <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} type="button" className="p-2 text-zinc-500 hover:text-zinc-800 rounded-full hover:bg-amber-100/50 transition-colors"><Smile size={20} /></motion.button>
+                        <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} type="button" className="p-2 text-zinc-500 hover:text-zinc-800 rounded-full hover:bg-amber-100/50 transition-colors"><Paperclip size={20} /></motion.button>
+                    </div>
+                    <input
+                        type="text"
+                        placeholder="Type a message..."
+                        value={newMessage}
+                        onChange={(e) => setNewMessage(e.target.value)}
+                        className="w-full bg-amber-100/50 border-2 border-amber-200/60 rounded-full py-2.5 px-4 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-amber-400 text-sm text-zinc-900"
+                    />
+                    <motion.button type="submit" className="bg-zinc-900 text-white p-3 rounded-full hover:bg-zinc-800 transition-colors transform hover:scale-105" whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                        <Send size={20} />
+                    </motion.button>
+                </form>
+            </footer>
+        </>
+    );
+};
+
