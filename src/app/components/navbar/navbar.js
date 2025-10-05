@@ -3,12 +3,13 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Home, MessageSquare, Users, User, LogOut } from 'lucide-react';
+import { Home, MessageSquare, Users, User, LogOut, Calendar } from 'lucide-react';
 
 const navItems = [
     { href: '/studentdashboard', label: 'Dashboard', icon: Home },
-    { href: '/chat', label: 'Chat', icon: MessageSquare }, // EDIT: Changed href from '/chats' to '/chat'
+    { href: '/chat', label: 'Chat', icon: MessageSquare },
     { href: '/mentors', label: 'Find Mentors', icon: Users },
+    { href: '/schedule', label: 'Schedule', icon: Calendar },
     { href: '/profile', label: 'Create Profile', icon: User },
 ];
 
